@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, BigInteger, String
-from ..base import Base
+from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey
+from sqlalchemy.orm import relationship
+from base import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -10,5 +11,7 @@ class User(Base):
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     phone = Column(String, nullable=True)
-    role = Column(String, default="customer")
+    role_id = Column(Integer, ForeignKey("roles.id"), default=1)
     points = Column(Integer, default=0)
+
+    role = relationship("Role", back_populates="users")
