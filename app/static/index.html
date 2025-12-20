@@ -5,58 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teezy Bubble Tea</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; font-family: 'Roboto', sans-serif; background: #f8e8ff; color: #333; }
-        h1, h2 { font-family: 'Comfortaa', cursive; text-align: center; color: #9c27b0; }
-        .container { max-width: 480px; margin: 0 auto; padding: 16px; }
-        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .btn { background: #9c27b0; color: white; border: none; padding: 12px; border-radius: 12px; width: 100%; font-size: 16px; margin-top: 8px; cursor: pointer; }
+        :root {
+            --primary: #9c27b0;
+            --primary-light: #e040fb;
+            --accent: #ff4081;
+            --bg: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text: #333;
+        }
+        body { margin: 0; font-family: 'Roboto', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        h1 { font-family: 'Comfortaa', cursive; text-align: center; color: var(--primary); margin: 20px 0; font-size: 28px; }
+        .container { max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { background: var(--card-bg); border-radius: 20px; padding: 16px; margin-bottom: 16px; box-shadow: 0 8px 20px rgba(156,39,176,0.15); backdrop-filter: blur(10px); }
+        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+        .menu-item { text-align: center; background: white; border-radius: 16px; padding: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .menu-item:hover { transform: translateY(-4px); }
+        .menu-item img { width: 100%; height: 120px; object-fit: cover; border-radius: 12px; }
+        .menu-item h3 { margin: 8px 0 4px; font-size: 16px; }
+        .menu-item p { margin: 0; font-weight: 500; color: var(--primary); }
+        .add-btn { background: var(--primary); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; }
+        .cart-badge { position: fixed; bottom: 80px; right: 20px; background: var(--accent); color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 15px rgba(255,64,129,0.4); cursor: pointer; z-index: 10; }
+        .cart-badge span { position: absolute; top: -8px; right: -8px; background: white; color: var(--accent); min-width: 24px; height: 24px; border-radius: 50%; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+        nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); z-index: 100; }
+        nav button { background: none; border: none; font-size: 12px; color: #999; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        nav button.active { color: var(--primary); }
+        nav button svg { width: 24px; height: 24px; fill: currentColor; }
+        .btn { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 16px; width: 100%; font-size: 18px; margin-top: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(156,39,176,0.3); }
         .btn:disabled { background: #ccc; }
-        #menu, #promotions, #order, #loyalty { display: none; }
-        .active { display: block; }
-        .item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-        nav { display: flex; justify-content: space-around; background: white; position: fixed; bottom: 0; width: 100%; padding: 8px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
-        nav button { background: none; border: none; font-size: 14px; color: #9c27b0; }
-        nav button.active { font-weight: bold; border-bottom: 3px solid #9c27b0; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Teezy Bubble Tea</h1>
-        <div id="menu" class="active">
-            <h2>Меню</h2>
-            <div class="card" id="menu-list">Загрузка меню...</div>
-            <button class="btn" onclick="showSection('order')">Перейти к заказу</button>
+        <h1>🍵 Teezy Bubble Tea</h1>
+
+        <div id="menu" class="section active">
+            <div class="card">
+                <h2>Меню</h2>
+                <div class="menu-grid" id="menu-list">Загрузка...</div>
+            </div>
         </div>
 
-        <div id="promotions">
-            <h2>Акции и скидки</h2>
-            <div class="card" id="promo-list">Загрузка...</div>
+        <div id="promotions" class="section">
+            <div class="card">
+                <h2>Акции и промокоды</h2>
+                <div id="promo-list">Загрузка...</div>
+            </div>
         </div>
 
-        <div id="order">
-            <h2>Оформление заказа</h2>
-            <div class="card" id="cart-items"></div>
-            <input type="text" id="discount-code" placeholder="Промокод" style="width:100%; padding:8px; margin-bottom:8px;">
-            <input type="datetime-local" id="pickup-time" required style="width:100%; padding:8px; margin-bottom:8px;">
-            <button class="btn" id="place-order">Оформить заказ</button>
+        <div id="order" class="section">
+            <div class="card">
+                <h2>Корзина</h2>
+                <div id="cart-items">Корзина пуста</div>
+                <input type="text" id="discount-code" placeholder="Промокод">
+                <input type="datetime-local" id="pickup-time" required>
+                <button class="btn" id="place-order">Оформить заказ</button>
+            </div>
         </div>
 
-        <div id="loyalty">
-            <h2>Лояльность</h2>
-            <div class="card">Баллов: <span id="points">0</span></div>
-            <button class="btn" onclick="loadFavorite()">Загрузить любимый заказ</button>
+        <div id="loyalty" class="section">
+            <div class="card">
+                <h2>Ваши баллы</h2>
+                <p style="font-size: 32px; text-align: center; color: var(--primary);"><span id="points">0</span> 🍬</p>
+                <button class="btn" onclick="loadFavorite()">Загрузить любимый заказ</button>
+            </div>
         </div>
     </div>
 
+    <div class="cart-badge" onclick="showSection('order')">
+        🛒 <span id="cart-count">0</span>
+    </div>
+
     <nav>
-        <button class="active" onclick="showSection('menu')">Меню</button>
-        <button onclick="showSection('promotions')">Акции</button>
-        <button onclick="showSection('order')">Заказ</button>
-        <button onclick="showSection('loyalty')">Баллы</button>
+        <button class="active" onclick="showSection('menu')">
+            <svg><use href="#menu-icon"/></svg> Меню
+        </button>
+        <button onclick="showSection('promotions')">
+            <svg><use href="#promo-icon"/></svg> Акции
+        </button>
+        <button onclick="showSection('order')">
+            <svg><use href="#cart-icon"/></svg> Заказ
+        </button>
+        <button onclick="showSection('loyalty')">
+            <svg><use href="#loyalty-icon"/></svg> Баллы
+        </button>
     </nav>
 
     <script src="/static/app.js"></script>
+    <script>
+        // Простые SVG иконки для навигации
+        document.write(`
+            <svg style="display:none">
+                <symbol id="menu-icon" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></symbol>
+                <symbol id="promo-icon" viewBox="0 0 24 24"><path d="M12 2L2 12h3v8h14v-8h3L12 2zm0 3.17L18.83 12H16v6H8v-6H5.17L12 5.17zM12 15l4-4h-3V8h-2v3H8l4 4z"/></symbol>
+                <symbol id="cart-icon" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM17 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM7 6h12l-1.5 8H7L5.5 6z"/></symbol>
+                <symbol id="loyalty-icon" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></symbol>
+            </svg>
+        `);
+    </script>
 </body>
 </html>

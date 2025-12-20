@@ -19,12 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(menu_router)
-app.include_router(promotion_router)
-app.include_router(order_router)
-app.include_router(loyalty_router)
-app.include_router(newsletter_router)
-app.include_router(export_router)
+app.include_router(menu_router, prefix="/api")
+app.include_router(promotion_router, prefix="/api")
+app.include_router(order_router, prefix="/api")
+app.include_router(loyalty_router, prefix="/api")
+app.include_router(newsletter_router, prefix="/api")
+app.include_router(export_router, prefix="/api")
 
 
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
