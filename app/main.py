@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routers.menu import router as menu_router
+import uvicorn
 
 app = FastAPI(title="Teezy Loyalty System", version="1.0")
 
@@ -10,6 +12,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(menu_router)
 
 @app.get("/")
 def health_check():

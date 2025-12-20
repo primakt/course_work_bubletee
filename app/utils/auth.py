@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from models.user import User
-from dependencies import get_db
+from base import get_db
 import hashlib
 import hmac
 import time
