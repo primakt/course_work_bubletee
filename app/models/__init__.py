@@ -8,3 +8,5 @@ from .promotion import Promotion
 from .loyalty_point import LoyaltyPoint
 from .favorite_order import FavoriteOrder
 from .store import Store
+from .newsletter import Newsletter
+from .user_subscription import UserSubscription
