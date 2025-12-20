@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from dependencies import get_db
+from base import get_db
 from models.favorite_order import FavoriteOrder
 from models.user import User
 from schemas.loyalty import FavoriteOrderCreate, FavoriteOrderResponse, LoyaltyResponse
