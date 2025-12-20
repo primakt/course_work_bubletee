@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from dependencies import get_db
+from base import get_db
 from models.promotion import Promotion
 from models.discount import Discount
 from schemas.promotion import PromotionCreate, PromotionResponse
