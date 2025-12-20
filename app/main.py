@@ -5,6 +5,7 @@ from routers.promotion import router as promotion_router
 from routers.order import router as order_router
 from routers.loyalty import router as loyalty_router
 from routers.newsletter import router as newsletter_router
+from routers.export import router as export_router
 import uvicorn
 
 app = FastAPI(title="Teezy Loyalty System", version="1.0")
@@ -22,6 +23,7 @@ app.include_router(promotion_router)
 app.include_router(order_router)
 app.include_router(loyalty_router)
 app.include_router(newsletter_router)
+app.include_router(export_router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", reload=True)
