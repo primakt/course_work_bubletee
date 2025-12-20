@@ -6,3 +6,4 @@ from .orderitem import OrderItem
 from .discount import Discount
 from .promotion import Promotion
 from .loyalty_point import LoyaltyPoint
+from .favorite_order import FavoriteOrder
