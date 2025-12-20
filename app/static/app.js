@@ -1,146 +1,517 @@
-let cart = JSON.parse(localStorage.getItem('teezy_cart') || '[]');
-let menuItems = [];
-
+// === КОНФИГУРАЦИЯ ===
 const API_BASE = "/api";
+const STORAGE_KEY = 'teezy_cart';
 
+// === СОСТОЯНИЕ ПРИЛОЖЕНИЯ ===
+let cart = [];
+let menuItems = [];
+let userData = null;
+
+// === ИНИЦИАЛИЗАЦИЯ ===
 function initApp() {
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
-    updateCartBadge();
-    loadMenu();
-    loadPromotions();
-    loadLoyalty();
-    setMinPickupTime();
-}
-
-async function apiCall(endpoint, options = {}) {
-    const initData = Telegram.WebApp.initData;
-    const headers = { "Content-Type": "application/json" };
-    if (initData) headers["X-Telegram-Init-Data"] = initData;
-
-    const res = await fetch(API_BASE + endpoint, { ...options, headers });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.detail || "Ошибка");
-        throw new Error(err.detail);
+    try {
+        // Инициализация Telegram WebApp
+        if (window.Telegram?.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+            Telegram.WebApp.enableClosingConfirmation();
+            
+            // Настройка темы
+            Telegram.WebApp.setHeaderColor('#D946EF');
+            Telegram.WebApp.setBackgroundColor('#FDF4FF');
+        }
+        
+        // Загрузка корзины из localStorage
+        loadCartFromStorage();
+        
+        // Установка минимального времени самовывоза
+        setMinPickupTime();
+        
+        // Загрузка данных
+        loadMenu();
+        loadPromotions();
+        loadLoyalty();
+        
+        // Обновление UI
+        updateCartBadge();
+        updateCartDisplay();
+        
+        console.log('✅ App initialized successfully');
+        
+    } catch (error) {
+        console.error('❌ Initialization error:', error);
+        showError('Ошибка инициализации приложения');
     }
-    return res.json();
 }
 
+// === API ФУНКЦИИ ===
+async function apiCall(endpoint, options = {}) {
+    try {
+        // Получаем initData из Telegram WebApp
+        const initData = window.Telegram?.WebApp?.initData || '';
+        
+        if (!initData) {
+            console.warn('⚠️ No Telegram initData available');
+        }
+        
+        const headers = {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": initData
+        };
+        
+        const config = {
+            ...options,
+            headers: {
+                ...headers,
+                ...(options.headers || {})
+            }
+        };
+        
+        console.log(`🌐 API Call: ${endpoint}`, config);
+        
+        const response = await fetch(API_BASE + endpoint, config);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        return await response.json();
+        
+    } catch (error) {
+        console.error(`❌ API Error [${endpoint}]:`, error);
+        throw error;
+    }
+}
+
+// === МЕНЮ ===
 async function loadMenu() {
-    menuItems = await apiCall("/menu/");
-    const list = document.getElementById("menu-list");
-    list.innerHTML = menuItems.map(item => `
+    try {
+        menuItems = await apiCall("/menu/");
+        renderMenu();
+        console.log('✅ Menu loaded:', menuItems.length, 'items');
+    } catch (error) {
+        showError('Не удалось загрузить меню');
+        document.getElementById("menu-list").innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">😔</div>
+                <p>Не удалось загрузить меню</p>
+            </div>
+        `;
+    }
+}
+
+function renderMenu() {
+    const container = document.getElementById("menu-list");
+    
+    if (menuItems.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🍵</div>
+                <p>Меню временно недоступно</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = menuItems.map(item => `
         <div class="menu-item">
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : '<div style="height:120px;background:#f3e5f5;border-radius:12px;"></div>'}
-            <h3>${item.name}</h3>
-            <p>${item.price} ₽</p>
-            <button class="add-btn" onclick="addToCart(${item.id})">+</button>
+            <div class="menu-item-image">
+                ${item.image_url 
+                    ? `<img src="${item.image_url}" alt="${item.name}" onerror="this.style.display='none'">`
+                    : '🧋'
+                }
+            </div>
+            <div class="menu-item-info">
+                <h3>${item.name}</h3>
+                <div class="menu-item-price">${item.price} ₽</div>
+                <button class="add-btn" onclick="addToCart(${item.id})">
+                    Добавить
+                </button>
+            </div>
         </div>
     `).join('');
 }
 
+// === АКЦИИ ===
 async function loadPromotions() {
-    const promotions = await apiCall("/promotions/");
-    const discounts = await apiCall("/promotions/discounts");
-    const list = document.getElementById("promo-list");
-    let html = "<h3>🔥 Акции</h3>";
-    promotions.forEach(p => html += `<div class="card"><strong>${p.title}</strong><p>${p.description}</p></div>`);
-    if (discounts.length) {
-        html += "<h3>🎟 Промокоды</h3>";
-        discounts.forEach(d => html += `<div class="card"><strong>${d.code}</strong> — ${d.percentage ? d.percentage + '%' : d.value + ' ₽'} скидка</div>`);
+    try {
+        const [promotions, discounts] = await Promise.all([
+            apiCall("/promotions/"),
+            apiCall("/promotions/discounts")
+        ]);
+        
+        renderPromotions(promotions, discounts);
+        console.log('✅ Promotions loaded');
+        
+    } catch (error) {
+        showError('Не удалось загрузить акции');
+        document.getElementById("promo-list").innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">😔</div>
+                <p>Не удалось загрузить акции</p>
+            </div>
+        `;
     }
-    list.innerHTML = html || "Нет активных акций";
 }
 
+function renderPromotions(promotions, discounts) {
+    const container = document.getElementById("promo-list");
+    let html = '';
+    
+    if (promotions.length > 0) {
+        html += promotions.map(promo => `
+            <div class="promo-card">
+                <h3>${promo.title}</h3>
+                <p>${promo.description}</p>
+            </div>
+        `).join('');
+    }
+    
+    if (discounts.length > 0) {
+        html += '<div class="card"><h3>🎟️ Промокоды</h3>';
+        html += discounts.map(discount => `
+            <div class="promo-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div class="promo-code">${discount.code}</div>
+                    </div>
+                    <div style="font-size: 24px; font-weight: 800;">
+                        ${discount.percentage ? discount.percentage + '%' : discount.value + ' ₽'}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        html += '</div>';
+    }
+    
+    if (html === '') {
+        html = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📢</div>
+                <p>Нет активных акций</p>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+// === БАЛЛЫ ЛОЯЛЬНОСТИ ===
 async function loadLoyalty() {
-    const { points } = await apiCall("/loyalty/balance");
-    document.getElementById("points").innerText = points;
+    try {
+        const data = await apiCall("/loyalty/balance");
+        document.getElementById("points").innerText = data.points;
+        userData = data;
+        console.log('✅ Loyalty loaded:', data.points, 'points');
+    } catch (error) {
+        console.warn('⚠️ Could not load loyalty points:', error);
+        document.getElementById("points").innerText = '0';
+    }
 }
 
-function addToCart(id) {
-    const item = menuItems.find(i => i.id === id);
-    const existing = cart.find(c => c.menu_item_id === id);
-    if (existing) existing.quantity++;
-    else cart.push({ menu_item_id: id, quantity: 1, name: item.name, price: item.price });
-    localStorage.setItem('teezy_cart', JSON.stringify(cart));
+// === КОРЗИНА ===
+function loadCartFromStorage() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        cart = stored ? JSON.parse(stored) : [];
+    } catch (error) {
+        console.error('❌ Error loading cart:', error);
+        cart = [];
+    }
+}
+
+function saveCartToStorage() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+    } catch (error) {
+        console.error('❌ Error saving cart:', error);
+    }
+}
+
+function addToCart(itemId) {
+    const menuItem = menuItems.find(i => i.id === itemId);
+    
+    if (!menuItem) {
+        showError('Товар не найден');
+        return;
+    }
+    
+    const existingItem = cart.find(c => c.menu_item_id === itemId);
+    
+    if (existingItem) {
+        existingItem.quantity++;
+    } else {
+        cart.push({
+            menu_item_id: itemId,
+            quantity: 1,
+            name: menuItem.name,
+            price: parseFloat(menuItem.price)
+        });
+    }
+    
+    saveCartToStorage();
     updateCartBadge();
     updateCartDisplay();
-    // Анимация
-    Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    
+    // Тактильная обратная связь
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+    
+    console.log('✅ Added to cart:', menuItem.name);
+}
+
+function updateQuantity(itemId, change) {
+    const item = cart.find(c => c.menu_item_id === itemId);
+    
+    if (!item) return;
+    
+    item.quantity += change;
+    
+    if (item.quantity <= 0) {
+        cart = cart.filter(c => c.menu_item_id !== itemId);
+    }
+    
+    saveCartToStorage();
+    updateCartBadge();
+    updateCartDisplay();
+    
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
 }
 
 function updateCartBadge() {
-    const count = cart.reduce((s, i) => s + i.quantity, 0);
+    const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     document.getElementById("cart-count").innerText = count;
 }
 
 function updateCartDisplay() {
     const container = document.getElementById("cart-items");
+    const form = document.getElementById("cart-form");
+    
     if (cart.length === 0) {
-        container.innerHTML = "<p style='text-align:center;color:#999;'>Корзина пуста</p>";
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🛍️</div>
+                <p>Корзина пуста</p>
+            </div>
+        `;
+        form.style.display = 'none';
         return;
     }
-    container.innerHTML = cart.map(c => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;">
-            <div><strong>${c.name}</strong> × ${c.quantity}</div>
-            <div>${c.price * c.quantity} ₽</div>
+    
+    const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    container.innerHTML = cart.map(item => `
+        <div class="cart-item">
+            <div class="cart-item-info">
+                <strong>${item.name}</strong>
+                <div class="cart-item-quantity">
+                    <button class="qty-btn" onclick="updateQuantity(${item.menu_item_id}, -1)">−</button>
+                    <span style="min-width: 30px; text-align: center; font-weight: 700;">${item.quantity}</span>
+                    <button class="qty-btn" onclick="updateQuantity(${item.menu_item_id}, 1)">+</button>
+                </div>
+            </div>
+            <div class="cart-item-price">
+                <div class="price">${(item.price * item.quantity).toFixed(2)} ₽</div>
+            </div>
         </div>
     `).join('');
+    
+    document.getElementById("total-price").innerText = `${totalPrice.toFixed(2)} ₽`;
+    form.style.display = 'block';
 }
 
-async function loadFavorite() {
-    const fav = await apiCall("/loyalty/favorite");
-    if (fav && fav.order_details?.length) {
-        cart = fav.order_details.map(d => ({
-            menu_item_id: d.menu_item_id,
-            quantity: d.quantity,
-            name: menuItems.find(i => i.id === d.menu_item_id)?.name || "???",
-            price: menuItems.find(i => i.id === d.menu_item_id)?.price || 0
-        }));
-        localStorage.setItem('teezy_cart', JSON.stringify(cart));
-        updateCartDisplay();
-        updateCartBadge();
-        showSection('order');
-        alert("Любимый заказ загружен! 🍵");
-    } else alert("Любимый заказ не сохранён");
-}
-
+// === ОФОРМЛЕНИЕ ЗАКАЗА ===
 function setMinPickupTime() {
     const input = document.getElementById("pickup-time");
-    const min = new Date(Date.now() + 15*60*1000);
-    input.min = min.toISOString().slice(0,16);
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 15);
+    
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    input.min = `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-document.getElementById("place-order").addEventListener("click", async () => {
-    if (cart.length === 0) return alert("Корзина пуста");
-    const pickup = document.getElementById("pickup-time").value;
-    if (!pickup) return alert("Выберите время самовывоза");
-
-    const data = {
-        items: cart.map(c => ({ menu_item_id: c.menu_item_id, quantity: c.quantity })),
-        discount_code: document.getElementById("discount-code").value.trim() || null,
-        pickup_time: new Date(pickup).toISOString(),
+document.getElementById("place-order")?.addEventListener("click", async () => {
+    if (cart.length === 0) {
+        showError("Корзина пуста");
+        return;
+    }
+    
+    const pickupTime = document.getElementById("pickup-time").value;
+    if (!pickupTime) {
+        showError("Выберите время самовывоза");
+        return;
+    }
+    
+    const discountCode = document.getElementById("discount-code").value.trim() || null;
+    
+    const orderData = {
+        items: cart.map(item => ({
+            menu_item_id: item.menu_item_id,
+            quantity: item.quantity
+        })),
+        discount_code: discountCode,
+        pickup_time: new Date(pickupTime).toISOString(),
         store_id: 1
     };
-
+    
     try {
-        const order = await apiCall("/orders/", { method: "POST", body: JSON.stringify(data) });
-        alert(`Заказ №${order.id} оформлен!\nНачислено баллов: ${Math.floor(order.total_price / 100)}`);
+        // Показываем индикатор загрузки
+        const btn = document.getElementById("place-order");
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = "Оформление...";
+        
+        const order = await apiCall("/orders/", {
+            method: "POST",
+            body: JSON.stringify(orderData)
+        });
+        
+        console.log('✅ Order created:', order);
+        
+        // Очищаем корзину
         cart = [];
-        localStorage.removeItem('teezy_cart');
+        saveCartToStorage();
         updateCartBadge();
         updateCartDisplay();
-        loadLoyalty();
-    } catch (e) {}
+        
+        // Обновляем баллы
+        await loadLoyalty();
+        
+        // Показываем уведомление
+        if (window.Telegram?.WebApp) {
+            Telegram.WebApp.showAlert(
+                `🎉 Заказ №${order.id} оформлен!\n\n` +
+                `Сумма: ${order.total_price} ₽\n` +
+                `Начислено баллов: ${Math.floor(order.total_price / 100)}\n\n` +
+                `Заберите ваш заказ ${new Date(order.pickup_time).toLocaleString('ru-RU')}`
+            );
+        } else {
+            alert(`Заказ №${order.id} оформлен!`);
+        }
+        
+        // Переходим на экран баллов
+        showSection('loyalty');
+        
+        btn.disabled = false;
+        btn.innerText = originalText;
+        
+    } catch (error) {
+        showError(`Ошибка оформления: ${error.message}`);
+        document.getElementById("place-order").disabled = false;
+        document.getElementById("place-order").innerText = "Оформить заказ";
+    }
 });
 
-function showSection(id) {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-    document.querySelector(`nav button[onclick="showSection('${id}')"]`).classList.add('active');
-    if (id === 'order') updateCartDisplay();
+// === ЛЮБИМЫЙ ЗАКАЗ ===
+async function loadFavorite() {
+    try {
+        const favorite = await apiCall("/loyalty/favorite");
+        
+        if (!favorite || !favorite.order_details || favorite.order_details.length === 0) {
+            showError("Любимый заказ не сохранён");
+            return;
+        }
+        
+        // Загружаем заказ в корзину
+        cart = favorite.order_details.map(item => {
+            const menuItem = menuItems.find(m => m.id === item.menu_item_id);
+            return {
+                menu_item_id: item.menu_item_id,
+                quantity: item.quantity,
+                name: menuItem?.name || "Неизвестный товар",
+                price: menuItem?.price ? parseFloat(menuItem.price) : 0
+            };
+        });
+        
+        saveCartToStorage();
+        updateCartBadge();
+        updateCartDisplay();
+        showSection('order');
+        
+        if (window.Telegram?.WebApp) {
+            Telegram.WebApp.showAlert("✅ Любимый заказ загружен!");
+        } else {
+            alert("Любимый заказ загружен!");
+        }
+        
+        console.log('✅ Favorite order loaded');
+        
+    } catch (error) {
+        showError(`Не удалось загрузить: ${error.message}`);
+    }
 }
 
-initApp();
+// === НАВИГАЦИЯ ===
+function showSection(sectionId) {
+    // Скрываем все секции
+    document.querySelectorAll('.section').forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // Показываем нужную секцию
+    document.getElementById(sectionId).classList.add('active');
+    
+    // Обновляем навигацию
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(
+        btn => btn.onclick.toString().includes(sectionId)
+    );
+    
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+    
+    // Обновляем отображение корзины при переходе
+    if (sectionId === 'order') {
+        updateCartDisplay();
+    }
+    
+    // Тактильная обратная связь
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+        Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+}
+
+// === УТИЛИТЫ ===
+function showError(message) {
+    console.error('❌', message);
+    
+    if (window.Telegram?.WebApp) {
+        Telegram.WebApp.showAlert(message);
+    } else {
+        alert(message);
+    }
+}
+
+function copyInitData() {
+    const initData = Telegram.WebApp.initData;
+    if (!initData) {
+        alert("initData ещё не загружено. Подожди секунду и попробуй снова.");
+        return;
+    }
+    navigator.clipboard.writeText(initData).then(() => {
+        alert("initData скопирована в буфер!\nТеперь вставь её в Swagger UI в заголовок X-Telegram-Init-Data");
+    }).catch(() => {
+        alert("Не удалось скопировать. initData в консоли (F12 если на ПК).");
+        console.log(initData);
+    });
+}
+
+// === ЗАПУСК ПРИЛОЖЕНИЯ ===
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}

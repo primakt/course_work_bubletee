@@ -1,9 +1,10 @@
 import subprocess
 import os
 from datetime import datetime
-from config import DATABASE_URL
 
 BACKUP_DIR = "backups"
+database_url = "postgresql+psycopg2://postgres:@localhost/teezy_loyalty"
+
 
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
@@ -12,7 +13,7 @@ def create_pg_dump():
     filename = f"teezy_backup_{timestamp}.sql"
     filepath = os.path.join(BACKUP_DIR, filename)
 
-    db_url_parts = DATABASE_URL.replace("postgresql+psycopg2://", "").split("@")
+    db_url_parts = database_url.replace("postgresql+psycopg2://", "").split("@")
     user_pass = db_url_parts[0].split(":")
     host_db = db_url_parts[1].split("/")
     

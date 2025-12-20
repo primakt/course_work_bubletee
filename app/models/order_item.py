@@ -11,5 +11,5 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)
     price_at_purchase = Column(Numeric(10, 2), nullable=False)
 
-    order = relationship("Order")
+    order = relationship("Order", back_populates="items")  # <-- ОБЯЗАТЕЛЬНО!
     menu_item = relationship("MenuItem")

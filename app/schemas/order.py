@@ -11,7 +11,6 @@ class OrderCreate(BaseModel):
     items: List[OrderItemCreate]
     discount_code: str | None = None
     pickup_time: datetime
-    store_id: int
 
 class OrderItemResponse(BaseModel):
     id: int
